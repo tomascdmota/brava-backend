@@ -13,7 +13,7 @@ export async function validateRegister(req, res, next) {
       return res.status(400).json({
         message: 'Please enter a username with min. 3 chars',
       });
-    }
+    }j
     // password min 6 chars
     if (!req.body.password || req.body.password.length < 6) {
       return res.status(400).json({
@@ -80,7 +80,7 @@ export async function validateRegister(req, res, next) {
     });
   }
   
-  function validateEmail(email) {
+  export function validateEmail(email) {
     // You can use a regular expression or a library like 'validator' to validate email format
     // Here, a simple regex is used for demonstration purposes
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -109,41 +109,4 @@ export async function validateRegister(req, res, next) {
   }
 
 
-  export async function fetchUserProfile(req, res, next) {
-    const userId = req.params.id;
-    try {
-       
-        const userData = await connection.query(
-            'SELECT username, email, registered FROM users WHERE id = ?;',
-            [userId],
-            (error, result) => {
-              if (error) {
-                console.error('Error executing query:', error);
-                return res.status(500).json({ message: 'Internal Server Error', error: error.message });
-              }
-              if (result.length === 0) {
-                // If user not found, return 404 and do not call next
-                return res.status(404).json({ message: 'User not found' });
-              }
-              
-              
-              console.log('Query Result:', result[0]);
-              // Continue with the rest of the code
-            }
-          );
-
-        if (!userData || !Array.isArray(userData) || userData.length === 0) {
-            return res.status(404).json({ message: 'User not found' });
-          }
-  
-      // If user found, attach user profile to request
-      req.userProfile = { ...userData, userId }; // Include userId in the response
-      next();
-  
-    } catch (error) {
-      console.log('Error fetching the user profile', error);
-      return res.status(500).json({ message: 'Internal Server Error', error: error.message });
-
-    }
-  }
 

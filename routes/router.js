@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs'
 import {v4 as uuidv4} from "uuid";
 import jwt from "jsonwebtoken"
 import connection from "../lib/db.js"
-import { validateRegister, fetchUserProfile } from '../middleware/users.js';
+import { validateRegister, validateEmail} from '../middleware/users.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -45,7 +45,7 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
               }
 
               // Generate JWT token
-              const token = jwt.sign({ userId, username, email }, JWT_SECRET, { expiresIn: '1h' });
+              const token = jwt.sign({ userId, username, email }, JWT_SECRET, { expiresIn: '30d' });
 
               // Assuming you want to send the user ID back to the frontend for session management
               req.userId = userId;
@@ -91,8 +91,8 @@ router.post('/login', (req, res, next) => {
                 username: result[0].username,
                 userId: result[0].id,
               },
-              'SECRETKEY',
-              { expiresIn: '7d' }
+              process.env.JWT_SECRET,
+              { expiresIn: '30d' }
             );
             connection.query(`UPDATE users SET last_login = now() WHERE id = ?;`, [
               result[0].id,
@@ -128,11 +128,7 @@ router.get('/profile/:id', (req, res) => {
         // If user not found, return 404
         return res.status(404).json({ message: 'User not found' });
       }
-
       const userData = result[0];
-
-      console.log('Query Result:', userData);
-
       // Send user data to the frontend
       res.json(userData);
     }
