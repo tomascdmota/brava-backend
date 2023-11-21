@@ -62,8 +62,8 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
 
 router.post('/login', (req, res, next) => {
   connection.query(
-    `SELECT * FROM users WHERE username = ?;`,
-    [req.body.username],
+    `SELECT * FROM users WHERE email = ?;`,
+    [req.body.email],
     (err, result) => {
       if (err) {
         return res.status(400).send({

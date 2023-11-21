@@ -13,7 +13,7 @@ export async function validateRegister(req, res, next) {
       return res.status(400).json({
         message: 'Please enter a username with min. 3 chars',
       });
-    }j
+    }
     // password min 6 chars
     if (!req.body.password || req.body.password.length < 6) {
       return res.status(400).json({
