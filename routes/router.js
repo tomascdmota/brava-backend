@@ -4,13 +4,24 @@ const router = express.Router();
 import bcrypt from 'bcryptjs'
 import {v4 as uuidv4} from "uuid";
 import jwt from "jsonwebtoken"
+import session from 'express-session';
 import connection from "../lib/db.js"
 import { validateRegister, validateEmail} from '../middleware/users.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+router.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: process.env.NODE_ENV === 'production' },
+  })
+);
+
+
 router.post('/sign-up', validateRegister, (req, res, next) => {
-  const { username, email, password } = req.body;
+  const { username, email, phone, password } = req.body;
 
   // Check if the username already exists
   connection.query(
@@ -36,8 +47,8 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
           const userId = uuidv4();
           // Insert user data into the database
           connection.query(
-            'INSERT INTO users (id, username, email, password, registered) VALUES (?, ?, ?, ?, NOW());',
-            [userId, username, email, hash],
+            'INSERT INTO users (id, username, email, phone, password, registered, last_login) VALUES (?, ?, ?, ?, ?, NOW(), NOW());',
+            [userId, username, email, phone, hash],
             (err, result) => {
               if (err) {
                 console.error('Error inserting user into the database:', err);
@@ -75,39 +86,43 @@ router.post('/login', (req, res, next) => {
           message: 'Username or password incorrect!',
         });
       }
-      bcrypt.compare(
-        req.body.password,
-        result[0]['password'],
-        (bErr, bResult) => {
-          if (bErr) {
-            return res.status(400).send({
-              message: 'Username or password incorrect!',
-            });
-          }
-          if (bResult) {
-            // password match
-            const token = jwt.sign(
-              {
-                username: result[0].username,
-                userId: result[0].id,
-              },
-              process.env.JWT_SECRET,
-              { expiresIn: '30d' }
-            );
-            connection.query(`UPDATE users SET last_login = now() WHERE id = ?;`, [
-              result[0].id,
-            ]);
-            return res.status(200).send({
-              message: 'Logged in!',
-              token,
-              user: result[0],
-            });
-          }
+      bcrypt.compare(req.body.password, result[0]['password'], (bErr, bResult) => {
+        if (bErr) {
           return res.status(400).send({
             message: 'Username or password incorrect!',
           });
         }
-      );
+        if (bResult) {
+          // password match
+
+          // Create a session variable with user information
+          req.session.user = {
+            username: result[0].username,
+            userId: result[0].id,
+          };
+
+          // Generate a JWT token
+          const token = jwt.sign(
+            {
+                username: result[0].username,
+                userId: result[0].id,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '30d' }
+        );
+
+          connection.query(`UPDATE users SET last_login = NOW() WHERE id = ?;`, [result[0].id]);
+
+          return res.status(200).send({
+            message: 'Logged in!',
+            token,
+            user: result[0],
+          });
+        }
+        return res.status(400).send({
+          message: 'Username or password incorrect!',
+        });
+      });
     }
   );
 });
