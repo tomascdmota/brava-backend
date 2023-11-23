@@ -52,7 +52,7 @@ export async function validateRegister(req, res, next) {
       const userId = uuidv4();
       const token = jwt.sign({ userId: userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
       
-      // Assuming you want to send the user ID back to the frontend for session management
+      // Assuming you want to  send the user ID back to the frontend for session management
       req.userId = userId;
       req.token = token;
       
