@@ -10,6 +10,7 @@ import AWS from "aws-sdk";
 import { Upload } from '@aws-sdk/lib-storage';
 import { S3Client, S3, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import multer from 'multer';
+import multerS3 from 'multer-s3'
 import formidable from 'formidable';
 import imageType from 'image-type';
 
@@ -32,34 +33,70 @@ const Bucket = process.env.S3_BUCKET;
 
 
 
+const s3Client = new S3Client({
+  credentials: {
+    accessKeyId,
+    secretAccessKey
+  },
+  region
+});
+
+
+
 const parsefile = async (req) => {
-  return new Promise((resolve, reject) => {
-    let resolved = false;
-    let options = {
-      maxFileSize: 100 * 1024 * 1024, //100 MBs converted to bytes,
-      allowEmptyFiles: false,
+  const options = {
+    maxFileSize: 10 * 1024 * 1024, // 10 MBs converted to bytes
+    allowEmptyFiles: false,
+  };
+
+  const form = formidable(options);
+
+  try {
+    const { fields, files } = await new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) {
+          reject(err.message);
+        } else {
+          resolve({ fields, files });
+        }
+      });
+    });
+
+    const uploadFile = async (file) => {
+      const s3Key = `${Date.now().toString()}-${file.originalFilename}`;
+
+      await new Upload({
+        client: new S3Client({
+          credentials: {
+            accessKeyId,
+            secretAccessKey,
+          },
+          region,
+        }),
+        params: {
+          ACL: 'public-read',
+          Bucket,
+          Key: s3Key,
+          Body: file,
+        },
+        tags: [], // optional tags
+        queueSize: 4, // optional concurrency configuration
+        partSize: 1024 * 1024 * 5, // optional size of each part, in bytes, at least 5MB
+        leavePartsOnError: false, // optional manually handle dropped parts
+      })
+        .done()
+        .then((data) => {
+          form.emit('data', { name: 'complete', value: data });
+        })
+        .catch((err) => {
+          form.emit('error', err);
+        });
     };
-
-    const form = formidable(options);
-
-    form.parse(req, (err, fields, files) => {});
-
-    form.on('error', (error) => {
-      if (!resolved) {
-        resolved = true;
-        reject(error.message);
-      }
-    });
-
-    form.on('data', (data) => {
-      if (!resolved && data.name === 'successUpload') {
-        resolved = true;
-        resolve(data.value);
-      }
-    });
 
     form.on('fileBegin', (formName, file) => {
       file.open = async function () {
+        const uploadPromise = uploadFile(this);
+
         this._writeStream = new Transform({
           transform(chunk, encoding, callback) {
             callback(null, chunk);
@@ -67,48 +104,19 @@ const parsefile = async (req) => {
         });
 
         this._writeStream.on('error', (e) => {
-          if (!resolved) {
-            resolved = true;
-            form.emit('error', e);
-          }
+          form.emit('error', e);
         });
 
-        // upload to S3
-        new Upload({
-          client: new S3Client({
-            credentials: {
-              accessKeyId,
-              secretAccessKey,
-            },
-            region,
-          }),
-          params: {
-            ACL: 'public-read',
-            Bucket,
-            Key: `${Date.now().toString()}-${this.originalFilename}`,
-            Body: this._writeStream,
-          },
-          tags: [], // optional tags
-          queueSize: 4, // optional concurrency configuration
-          partSize: 1024 * 1024 * 5, // optional size of each part, in bytes, at least 5MB
-          leavePartsOnError: false, // optional manually handle dropped parts
-        })
-          .done()
-          .then((data) => {
-            if (!resolved) {
-              resolved = true;
-              form.emit('data', { name: 'complete', value: data });
-            }
-          })
-          .catch((err) => {
-            if (!resolved) {
-              resolved = true;
-              form.emit('error', err);
-            }
-          });
+        try {
+          await uploadPromise;
+        } catch (err) {
+          form.emit('error', err);
+        }
       };
     });
-  });
+  } catch (error) {
+    form.emit('error', error);
+  }
 };
 
 router.use(
@@ -288,18 +296,13 @@ router.post("/createcard", upload.single('profilePicture'), async (req, res) => 
   }
 
   // Your S3 upload logic here
-  const s3Client = new S3Client({
-    credentials: {
-      accessKeyId,
-      secretAccessKey
-    },
-    region
-  });
+  
 
   const uploadParams = {
     Bucket,
     Key: `${Date.now().toString()}-${req.file.originalname}`,
     Body: req.file.buffer, // Assuming multer saves the file in req.file.buffer
+    ContentDisposition: 'inline'
   };
 
   try {
@@ -358,52 +361,64 @@ router.get("/:id/dashboard/cards", (req, res, next) => {
   });
 });
 
-
-router.get('/images/:id', async (req, res) => {
-  // Assuming the S3 key is stored in the profile_image_key field
-  const cardId = req.params.id;
-  
-  const s3Client = new S3Client({
-    credentials: {
-      accessKeyId,
-      secretAccessKey
-    },
-    region
-  });
-  // Fetch the card from the database to get the S3 key
-  const [card] = await new Promise((resolve, reject) => {
-    const s3Key = card.profile_image_url;
-    connection.query('SELECT * FROM cards WHERE id = ?;', [cardId], (err, result) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(result);
-      }
+router.get("/profile/:cardId", (req, res, next) => {
+  connection.query(`SELECT * FROM cards WHERE card_id = ?`, [req.params.id], (err, result) => {
+    if (err) {
+      return res.status(400).send({ message: err });
+    }
+    if (!result.length) {
+      return res.status(400).send({
+        message: 'No cards yet',
+      });
+    }
+    console.log(result)
+    return res.status(200).send({
+      message: "Cards",
+      cards: result,
     });
   });
+})
 
-  if (!card) {
-    return res.status(404).json({ message: 'Card not found' });
-  }
 
- 
+router.get('/images/:id', async (req, res) => {
+  const cardId = req.params.id;
 
-  // Fetch the image from S3
-  try {
-    
-    const data = await s3Client.send(new GetObjectCommand({ Bucket, Key: s3Key }));
-    const imageInfo = imageType(data.Body);
-    const imageBuffer = Buffer.from(data.Body);
+  // Fetch the card from the database to get the S3 key
+  connection.query('SELECT * FROM cards WHERE id = ?;', [cardId], async (err, result) => {
+    if (err) {
+      console.error('Error fetching card from the database:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
 
-    // Set appropriate headers and send the image to the client
-    res.setHeader('Content-Type', imageInfo.mime); // Adjust the content type based on your image type
-    res.send(imageBuffer);
-  } catch (error) {
-    console.log(s3Key)
-    console.error('Error fetching image from S3:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
+    if (result.length === 0) {
+      return res.status(404).json({ message: 'Card not found' });
+    }
+
+    const card = result[0];
+    const s3Key = card.profile_image_url;
+
+    const s3Client = new S3Client({
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+      region,
+    });
+
+    // Fetch the image from S3
+    try {
+      const data = await s3Client.send(new GetObjectCommand({ Bucket, Key: s3Key }));
+      const imageInfo = imageType(data.Body);
+      const imageBuffer = Buffer.from(data.Body);
+
+      // Set appropriate headers and send the image to the client
+      res.setHeader('Content-Type', imageInfo.mime);
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error('Error fetching image from S3:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
 });
-
 
 export default router;

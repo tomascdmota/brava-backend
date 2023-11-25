@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import jwt from "jsonwebtoken"
 import connection from '../lib/db.js';
 import dotenv from "dotenv"
+import s3Storage from 'multer-s3';
+import multer from 'multer';
 
 dotenv.config();
 
@@ -110,3 +112,31 @@ export async function validateRegister(req, res, next) {
 
 
 
+export function sanitizeFile(file, cb) {
+  const fileExts = ['.png', '.jpg', '.jpeg', '.gif'];
+
+  const isAllowedExt = fileExts.includes(
+    path.extname(file.originalname.toLowerCase())
+  );
+
+  // Mime type must be an image
+  const isAllowMimeType = file.mimetype.startsWith("image/");
+
+  
+  if (isAllowedExt && isAllowedMimeType) {
+    return cb(null, true); // no errors
+} else {
+    // pass error msg to callback, which can be displaye in frontend
+    cb("Error: File type not allowed!");
+}
+}
+
+export const uploadImage = multer({
+  storage: s3Storage,
+  fileFilter: (req, file, callback) => {
+    sanitizeFile(file, callback)
+  },
+  limits: {
+    fileSize: 1024 * 1024 * 10 //10mb file size
+  }
+})
