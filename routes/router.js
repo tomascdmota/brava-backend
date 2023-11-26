@@ -3,24 +3,22 @@ import express from 'express';
 import bcrypt from 'bcryptjs'
 import shortUUID from 'short-uuid';
 import jwt from "jsonwebtoken"
-import session from 'express-session';
 import connection from "../lib/db.js"
-import { validateRegister} from '../middleware/users.js';
-import AWS from "aws-sdk";
+import { validateRegister, verifyTokenMiddleware} from '../middleware/users.js';
 import { Upload } from '@aws-sdk/lib-storage';
 import { S3Client, S3, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import cookieParser from 'cookie-parser';
 import multer from 'multer';
-import multerS3 from 'multer-s3'
 import formidable from 'formidable';
 import imageType from 'image-type';
-
-
-
 import { Transform } from 'stream';
+
 
 
 const app = express();
 app.set('json spaces', 5)
+app.use(cookieParser());
+
 
 
 const router = express.Router();
@@ -119,19 +117,11 @@ const parsefile = async (req) => {
   }
 };
 
-router.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
-    resave: false,
-    saveUninitialized: true,
-    cookie: { secure: process.env.NODE_ENV === 'production' },
-  })
-);
+
 
 
 router.post('/sign-up', validateRegister, (req, res, next) => {
   const { username, email, phone, password } = req.body;
-
   // Check if the username already exists
   connection.query(
     'SELECT id FROM users WHERE LOWER(username) = LOWER(?);',
@@ -170,6 +160,12 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
               // Assuming you want to send the user ID back to the frontend for session management
               req.userId = userId;
               req.token = token;
+              
+              res.cookie('session_token', token, {
+                maxAge: 60*60*24*30*1000, //30 days
+                secure: false,
+                httpOnly: false
+              })
 
               return res.status(201).json({ userId, message: 'Registado com sucesso!', token });
             }
@@ -180,7 +176,7 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
   );
 });
 
-router.post('/login', (req, res, next) => {
+router.post('/login' ,(req, res, next) => {
   connection.query(
     `SELECT * FROM users WHERE email = ?;`,
     [req.body.email],
@@ -203,12 +199,7 @@ router.post('/login', (req, res, next) => {
         }
         if (bResult) {
           // password match
-
-          // Create a session variable with user information
-          req.session.user = {
-            username: result[0].username,
-            userId: result[0].id,
-          };
+          
 
           // Generate a JWT token
           const token = jwt.sign(
@@ -219,7 +210,11 @@ router.post('/login', (req, res, next) => {
             process.env.JWT_SECRET,
             { expiresIn: '30d' }
         );
-
+        res.cookie('session_token', token, {
+          maxAge: 60*60*24*30*1000, //30 days
+          secure: false,
+          httpOnly: false
+        })
           connection.query(`UPDATE users SET last_login = NOW() WHERE id = ?;`, [result[0].id]);
 
           return res.status(200).send({
@@ -236,7 +231,7 @@ router.post('/login', (req, res, next) => {
   );
 });
 
-router.get('/:id/profile', (req, res) => {
+router.get('/:id/profile', verifyTokenMiddleware,(req, res) => {
   const userId = req.params.id;
   console.log(res.data)
 
@@ -261,7 +256,7 @@ router.get('/:id/profile', (req, res) => {
 });
 
 
-router.get('/:id/dashboard', (req, res) => {
+router.get('/:id/dashboard', verifyTokenMiddleware,(req, res) => {
   const userId = req.params.id;
   console.log(res.data)
 
@@ -287,7 +282,7 @@ router.get('/:id/dashboard', (req, res) => {
 
 
 
-router.post("/createcard", upload.single('profilePicture'), async (req, res) => {
+router.post("/createcard", verifyTokenMiddleware, upload.single('profilePicture'), async (req, res) => {
   const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url } = req.body;
   const cardId = Math.floor(Math.random() * 1000000);
 
@@ -343,7 +338,7 @@ router.post("/createcard", upload.single('profilePicture'), async (req, res) => 
 });
 
 
-router.get("/:id/dashboard/cards", (req, res, next) => {
+router.get("/:id/dashboard/cards", verifyTokenMiddleware ,(req, res, next) => {
   connection.query(`SELECT * FROM cards WHERE id = ?;`, [req.params.id], (err, result) => {
     if (err) {
       return res.status(400).send({ message: err });
@@ -418,6 +413,27 @@ router.get('/images/:id', async (req, res) => {
       console.error('Error fetching image from S3:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
+  });
+});
+
+
+router.get("/:id/cards", (req, res,next) => {
+  const userId = req.params.id;
+
+  connection.query(`SELECT * FROM cards WHERE id = ?;`, [userId], (err, result) => {
+    if (err) {
+      return res.status(400).send({ message: err });
+    }
+    if (!result.length) {
+      return res.status(400).send({
+        message: 'No cards yet',
+      });
+    }
+    console.log(result)
+    return res.status(200).send({
+      message: "Cards",
+      cards: result,
+    });
   });
 });
 

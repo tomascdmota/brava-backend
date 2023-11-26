@@ -5,6 +5,7 @@ import connection from '../lib/db.js';
 import dotenv from "dotenv"
 import s3Storage from 'multer-s3';
 import multer from 'multer';
+import Cookies from "js-cookie";
 
 dotenv.config();
 
@@ -140,3 +141,21 @@ export const uploadImage = multer({
     fileSize: 1024 * 1024 * 10 //10mb file size
   }
 })
+
+
+export const verifyTokenMiddleware = (req, res, next) => {
+  
+  const token = req.cookies.session_token
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ message: 'Failed to authenticate token' });
+    }
+    // Attach the decoded payload to the request object for further use if needed
+    req.user = decoded;
+    next();
+  });
+};
