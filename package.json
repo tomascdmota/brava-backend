@@ -26,6 +26,7 @@
     "express-validator": "^7.0.1",
     "file-system": "^2.2.2",
     "formidable": "^3.5.1",
+    "https": "^1.0.0",
     "image-type": "^5.2.0",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",

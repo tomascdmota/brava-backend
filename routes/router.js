@@ -163,7 +163,7 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
               
               res.cookie('session_token', token, {
                 maxAge: 60*60*24*30*1000, //30 days
-                secure: false,
+                secure: true,
                 httpOnly: false
               })
 
