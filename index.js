@@ -1,6 +1,4 @@
 import express from "express";
-import https from 'https';
-import fs from 'fs';
 import cors from 'cors';
 import router from "./routes/router.js";
 import dotenv from "dotenv";
@@ -12,6 +10,7 @@ dotenv.config();
 const allowedOrigins = [
   'http://192.168.1.155:3000',
   'https://192.168.1.155:3000',
+  'http://10.11.66.111:3000',
   'https://brava-bucket.s3.eu-west-2.amazonaws.com',
 ];
 

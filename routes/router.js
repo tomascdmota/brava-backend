@@ -257,9 +257,8 @@ router.get('/:id/profile', verifyTokenMiddleware,(req, res) => {
 });
 
 
-router.get('/:id/dashboard', verifyTokenMiddleware,(req, res) => {
+router.get('/:id/dashboard', verifyTokenMiddleware, (req, res) => {
   const userId = req.params.id;
-  console.log(res.data)
 
   connection.query(
     'SELECT * FROM contacts WHERE user_id = ?;',
@@ -267,20 +266,26 @@ router.get('/:id/dashboard', verifyTokenMiddleware,(req, res) => {
     (error, result) => {
       if (error) {
         console.error('Error executing query:', error);
+        connection.release();
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
       }
 
-      if (result.length === 0) {
-        // If user not found, return 404
-        return res.status(404).json({ message: 'User not found' });
+      // You may want to handle the case where the result is an empty array differently,
+      // depending on your use case. For now, let's just return the array.
+    
+      const userData = result;
+
+      if(userData === null){
+        res.status(203).send({message: "No contacts"});
+        console.log("No userdata")
       }
-      const userData = result[0];
       // Send user data to the frontend
       res.json(userData);
+      console.log(userData)
+      console.log("Contact count:", userData.length)
     }
   );
 });
-
 
 
 router.post("/createcard", verifyTokenMiddleware, upload.single('profilePicture'), async (req, res) => {
@@ -455,7 +460,7 @@ router.post('/:id/message',(req,res,next) => {
   console.log("email", email);
   console.log("Message", message);
 
-  connection.query(`INSERT INTO contacts (user_id, contact_id, name, email, message ) VALUES (?, ?, ?, ?, ?)`, [userId, contact_id, name,email,message], async (err, result) => {
+  connection.query(`INSERT INTO contacts (user_id, contact_id, name, email, message, contact_date ) VALUES (?, ?, ?, ?, ?, NOW())`, [userId, contact_id, name,email,message], async (err, result) => {
     if(err) {
       return res.status(500).send({message: "Error sending contact"});
     }
