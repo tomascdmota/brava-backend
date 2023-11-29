@@ -9,7 +9,11 @@ import cookieParser from "cookie-parser";
 const app = express();
 
 dotenv.config();
-const allowedOrigins = ['http://192.168.1.155:3000', 'https://192.168.1.155:3000', 'https://brava-bucket.s3.eu-west-2.amazonaws.com/*'];
+const allowedOrigins = [
+  'http://192.168.1.155:3000',
+  'https://192.168.1.155:3000',
+  'https://brava-bucket.s3.eu-west-2.amazonaws.com',
+];
 
 
 

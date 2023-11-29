@@ -159,3 +159,39 @@ export const verifyTokenMiddleware = (req, res, next) => {
     next();
   });
 };
+
+export const  validateFormInputs = (inputs) => {
+  const errors = {};
+
+  // Validate each input field
+  Object.keys(inputs).forEach((fieldName) => {
+    const value = inputs[fieldName].trim();
+
+    // Check if the field is empty
+    if (value === '') {
+      errors[fieldName] = 'This field is required';
+    } else {
+      // Additional validation based on field name
+      switch (fieldName) {
+        case 'email':
+          // Validate email format using a regular expression
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            errors[fieldName] = 'Invalid email format';
+          }
+          break;
+        // Add other cases for specific validation rules based on field name
+        // case 'phone':
+        //   // Validate phone number format
+        //   // Add your phone number validation logic here
+        //   break;
+        default:
+          // Clear any existing error for the field
+          delete errors[fieldName];
+      }
+    }
+  });
+
+  return errors;
+}
+

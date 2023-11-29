@@ -25,6 +25,7 @@
     "express-session": "^1.17.3",
     "express-validator": "^7.0.1",
     "file-system": "^2.2.2",
+    "file-type": "^18.7.0",
     "formidable": "^3.5.1",
     "https": "^1.0.0",
     "image-type": "^5.2.0",

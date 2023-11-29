@@ -4,14 +4,14 @@ import bcrypt from 'bcryptjs'
 import shortUUID from 'short-uuid';
 import jwt from "jsonwebtoken"
 import connection from "../lib/db.js"
-import { validateRegister, verifyTokenMiddleware} from '../middleware/users.js';
+import { validateRegister, verifyTokenMiddleware,validateFormInputs} from '../middleware/users.js';
 import { Upload } from '@aws-sdk/lib-storage';
 import { S3Client, S3, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import formidable from 'formidable';
 import imageType from 'image-type';
-import { Transform } from 'stream';
+
 
 
 
@@ -50,71 +50,72 @@ const parsefile = async (req) => {
   const form = formidable(options);
 
   try {
-    const { fields, files } = await new Promise((resolve, reject) => {
+    const { files } = await new Promise((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) {
           reject(err.message);
         } else {
-          resolve({ fields, files });
+          resolve({ files });
         }
       });
     });
 
     const uploadFile = async (file) => {
-      const s3Key = `${Date.now().toString()}-${file.originalFilename}`;
+      const s3Key = `${Date.now().toString()}-${file.name}`;
+      const fileBuffer = await fileToBuffer(file);
+      const fileTypeResult = imageType(fileBuffer);
 
-      await new Upload({
-        client: new S3Client({
-          credentials: {
-            accessKeyId,
-            secretAccessKey,
-          },
-          region,
-        }),
-        params: {
-          ACL: 'public-read',
-          Bucket,
-          Key: s3Key,
-          Body: file,
+      const contentType = fileTypeResult ? fileTypeResult.mime : 'application/octet-stream';
+
+      const s3Client = new S3Client({
+        credentials: {
+          accessKeyId,
+          secretAccessKey,
         },
-        tags: [], // optional tags
-        queueSize: 4, // optional concurrency configuration
-        partSize: 1024 * 1024 * 5, // optional size of each part, in bytes, at least 5MB
-        leavePartsOnError: false, // optional manually handle dropped parts
-      })
-        .done()
-        .then((data) => {
-          form.emit('data', { name: 'complete', value: data });
-        })
-        .catch((err) => {
-          form.emit('error', err);
-        });
+        region,
+      });
+
+      const uploadParams = {
+        ACL: 'public-read',
+        Bucket,
+        Key: s3Key,
+        Body: fileBuffer,
+        ContentType: contentType,
+      };
+
+      try {
+        // Upload file to S3
+        const s3Response = await s3Client.send(new PutObjectCommand(uploadParams));
+        return { s3Response, s3Key };
+      } catch (error) {
+        throw error;
+      }
     };
 
     form.on('fileBegin', (formName, file) => {
       file.open = async function () {
-        const uploadPromise = uploadFile(this);
-
-        this._writeStream = new Transform({
-          transform(chunk, encoding, callback) {
-            callback(null, chunk);
-          },
-        });
-
-        this._writeStream.on('error', (e) => {
-          form.emit('error', e);
-        });
-
-        try {
-          await uploadPromise;
-        } catch (err) {
-          form.emit('error', err);
-        }
+        const { s3Response, s3Key } = await uploadFile(this);
+        form.emit('data', { name: 'complete', value: { s3Response, s3Key } });
       };
     });
   } catch (error) {
     form.emit('error', error);
   }
+};
+
+const fileToBuffer = (file) => {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    file.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    file.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    file.on('error', (error) => {
+      reject(error);
+    });
+  });
 };
 
 
@@ -261,7 +262,7 @@ router.get('/:id/dashboard', verifyTokenMiddleware,(req, res) => {
   console.log(res.data)
 
   connection.query(
-    'SELECT username FROM users WHERE id = ?;',
+    'SELECT * FROM contacts WHERE user_id = ?;',
     [userId],
     (error, result) => {
       if (error) {
@@ -291,7 +292,7 @@ router.post("/createcard", verifyTokenMiddleware, upload.single('profilePicture'
   }
 
   // Your S3 upload logic here
-  
+    
 
   const uploadParams = {
     Bucket,
@@ -438,3 +439,29 @@ router.get("/:id/cards", (req, res,next) => {
 });
 
 export default router;
+
+
+
+
+
+
+router.post('/:id/message',(req,res,next) => {
+  const userId = req.params.id;
+  const contact_id = shortUUID.generate();
+  const {name, email, message} = req.body;
+  console.log("User id:", userId);
+  console.log("Contact id:", contact_id);
+  console.log("name:", name);
+  console.log("email", email);
+  console.log("Message", message);
+
+  connection.query(`INSERT INTO contacts (user_id, contact_id, name, email, message ) VALUES (?, ?, ?, ?, ?)`, [userId, contact_id, name,email,message], async (err, result) => {
+    if(err) {
+      return res.status(500).send({message: "Error sending contact"});
+    }
+    else{
+      return res.status(200).send({message: "Message sent."});
+    }
+  })
+})
+
