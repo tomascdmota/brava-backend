@@ -5,7 +5,6 @@ import shortUUID from 'short-uuid';
 import jwt from "jsonwebtoken"
 import connection from "../lib/db.js"
 import { validateRegister, verifyTokenMiddleware,validateFormInputs} from '../middleware/users.js';
-import { Upload } from '@aws-sdk/lib-storage';
 import { S3Client, S3, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
