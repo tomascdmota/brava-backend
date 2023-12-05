@@ -8,6 +8,7 @@ const app = express();
 app.use(cookieParser());
 dotenv.config();
 const allowedOrigins = [
+  'http://localhost:3000',
   'http://18.133.155.66:3000',
   'https://18.133.155.66:3000',
   'https://brava-bucket.s3.eu-west-2.amazonaws.com',

@@ -240,15 +240,15 @@ router.post('/login' ,(req, res, next) => {
 });
 
 
-app.get('/test-cookie', (req, res) => {
-  res.cookie('test_cookie', 'test_value', { path: '/' });
-  res.send('Cookie set!');
-});
+// app.get('/test-cookie', (req, res) => {
+//   res.cookie('test_cookie', 'test_value', { path: '/' });
+//   res.send('Cookie set!');
+// });
 
-app.get('/read-cookie', verifyTokenMiddleware,(req, res) => {
-  console.log('Cookies:', req.cookies);
-  res.send('Cookie read!');
-});
+// app.get('/read-cookie', verifyTokenMiddleware,(req, res) => {
+//   console.log('Cookies:', req.cookies);
+//   res.send('Cookie read!');
+// });
 
 
 
