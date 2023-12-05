@@ -214,7 +214,8 @@ router.post('/login' ,(req, res, next) => {
         res.cookie('session_token', token, {
           maxAge: 60*60*24*30*1000, //30 days
           secure: false,
-          httpOnly: false
+          httpOnly: false,
+	  sameSite: 'None',
         })
           connection.query(`UPDATE users SET last_login = NOW() WHERE id = ?;`, [result[0].id]);
 
@@ -232,7 +233,31 @@ router.post('/login' ,(req, res, next) => {
   );
 });
 
-router.get('/:id/profile', verifyTokenMiddleware,(req, res) => {
+
+app.get('/test-cookie', (req, res) => {
+  res.cookie('test_cookie', 'test_value', { path: '/' });
+  res.send('Cookie set!');
+});
+
+app.get('/read-cookie', verifyTokenMiddleware,(req, res) => {
+  console.log('Cookies:', req.cookies);
+  res.send('Cookie read!');
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+router.get('/:id/profile',(req, res) => {
   const userId = req.params.id;
   console.log(res.data)
 
@@ -253,13 +278,14 @@ router.get('/:id/profile', verifyTokenMiddleware,(req, res) => {
       // Send user data to the frontend
       res.json(userData);
     }
-  );
+)  
 });
 
 
-router.get('/:id/dashboard', verifyTokenMiddleware, (req, res) => {
+router.get('/:id/dashboard', (req, res) => {
   const userId = req.params.id;
-
+ const token = req.headers.authorization;
+          console.log("Incoming token:", token); 
   connection.query(
     'SELECT * FROM contacts WHERE user_id = ?;',
     [userId],
@@ -288,13 +314,10 @@ router.get('/:id/dashboard', verifyTokenMiddleware, (req, res) => {
 });
 
 
-router.post("/createcard", verifyTokenMiddleware, upload.single('profilePicture'), async (req, res) => {
+router.post("/createcard", upload.single('profilePicture'), async (req, res) => {
   const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url } = req.body;
   const cardId = Math.floor(Math.random() * 1000000);
 
-  if (!req.file) {
-    return res.status(400).json({ message: "No file provided" });
-  }
 
   // Your S3 upload logic here
     
@@ -344,7 +367,7 @@ router.post("/createcard", verifyTokenMiddleware, upload.single('profilePicture'
 });
 
 
-router.get("/:id/dashboard/cards", verifyTokenMiddleware ,(req, res, next) => {
+router.get("/:id/dashboard/cards" ,(req, res, next) => {
   connection.query(`SELECT * FROM cards WHERE id = ?;`, [req.params.id], (err, result) => {
     if (err) {
       return res.status(400).send({ message: err });

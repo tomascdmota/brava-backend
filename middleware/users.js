@@ -91,9 +91,12 @@ export async function validateRegister(req, res, next) {
   }
 
   export function validateToken(req, res, next) {
-    const token = req.headers.authorization;
+	  console.log("All cookies from validateToken:", req.cookies);
+    const token = req.cookies.session_token || req.headers.authorization;
+	  console.log("Incoming token:", token);
   
     if (!token) {
+	    console.log("received token from the frontend:", token);
       return res.status(401).json({ message: 'Unauthorized' });
     }
   
@@ -144,16 +147,24 @@ export const uploadImage = multer({
 
 
 export const verifyTokenMiddleware = (req, res, next) => {
+  console.log('Request Headers:', req.headers);
+  console.log('Cookies:', req.cookies);
   
-  const token = req.cookies.session_token
+  const token = req.cookies.session_token;
+
   if (!token) {
+    console.log('No token provided');
     return res.status(401).json({ message: 'No token provided' });
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
+      console.log('Failed to authenticate token');
       return res.status(401).json({ message: 'Failed to authenticate token' });
     }
+
+    console.log('Decoded Token:', decoded);
+
     // Attach the decoded payload to the request object for further use if needed
     req.user = decoded;
     next();
