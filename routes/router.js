@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import shortUUID from 'short-uuid';
 import jwt from "jsonwebtoken"
 import connection from "../lib/db.js"
-import { validateRegister, verifyTokenMiddleware,validateFormInputs} from '../middleware/users.js';
+import { validateRegister, validateFormInputs} from '../middleware/users.js';
 import { Upload } from '@aws-sdk/lib-storage';
 import { S3Client, S3, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import cookieParser from 'cookie-parser';
@@ -36,7 +36,7 @@ const s3Client = new S3Client({
     accessKeyId,
     secretAccessKey
   },
-  region
+  region, defaultAccessControlList: 'public-read',
 });
 
 
@@ -73,6 +73,7 @@ const parsefile = async (req) => {
           secretAccessKey,
         },
         region,
+       
       });
 
       const uploadParams = {
@@ -105,16 +106,22 @@ const parsefile = async (req) => {
 
 const fileToBuffer = (file) => {
   return new Promise((resolve, reject) => {
-    const chunks = [];
-    file.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-    file.on('end', () => {
-      resolve(Buffer.concat(chunks));
-    });
-    file.on('error', (error) => {
-      reject(error);
-    });
+    if (file.buffer) {
+      // For multer
+      resolve(file.buffer);
+    } else {
+      // For formidable
+      const chunks = [];
+      file.on('data', (chunk) => {
+        chunks.push(chunk);
+      });
+      file.on('end', () => {
+        resolve(Buffer.concat(chunks));
+      });
+      file.on('error', (error) => {
+        reject(error);
+      });
+    }
   });
 };
 
@@ -232,9 +239,8 @@ router.post('/login' ,(req, res, next) => {
   );
 });
 
-router.get('/:id/profile', verifyTokenMiddleware,(req, res) => {
+router.get('/:id/profile', (req, res) => {
   const userId = req.params.id;
-  console.log(res.data)
 
   connection.query(
     'SELECT username, email, phone, registered FROM users WHERE id = ?;',
@@ -257,7 +263,7 @@ router.get('/:id/profile', verifyTokenMiddleware,(req, res) => {
 });
 
 
-router.get('/:id/dashboard', verifyTokenMiddleware, (req, res) => {
+router.get('/:id/dashboard', (req, res) => {
   const userId = req.params.id;
 
   connection.query(
@@ -288,53 +294,62 @@ router.get('/:id/dashboard', verifyTokenMiddleware, (req, res) => {
 });
 
 
-router.post("/createcard", verifyTokenMiddleware, upload.single('profilePicture'), async (req, res) => {
+router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'background_image', maxCount: 1 }]), async (req, res) => {
   const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url } = req.body;
   const cardId = Math.floor(Math.random() * 1000000);
 
-  if (!req.file) {
-    return res.status(400).json({ message: "No file provided" });
+  if (!req.files || !req.files.profilePicture || !req.files.background_image) {
+    return res.status(400).json({ message: "Both profilePicture and background_image files are required" });
   }
 
-  // Your S3 upload logic here
-    
+  const profilePictureFile = req.files.profilePicture[0];
+  const backgroundImageFile = req.files.background_image[0];
 
-  const uploadParams = {
-    Bucket,
-    Key: `${Date.now().toString()}-${req.file.originalname}`,
-    Body: req.file.buffer, // Assuming multer saves the file in req.file.buffer
-    ContentDisposition: 'inline'
+  // Your S3 upload logic here
+  const uploadToS3 = async (file, type) => {
+    const s3Key = `${type}_${Date.now().toString()}-${file.originalname}`;
+    const fileBuffer = await fileToBuffer(file);
+    const fileTypeResult = imageType(fileBuffer);
+
+    const contentType = fileTypeResult ? fileTypeResult.mime : 'application/octet-stream';
+
+    const uploadParams = {
+      Bucket,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: contentType,
+    };
+
+    try {
+      // Upload file to S3
+      const s3Response = await s3Client.send(new PutObjectCommand(uploadParams));
+      return { s3Response, s3Key };
+    } catch (error) {
+      throw error;
+    }
   };
 
   try {
-    // Upload file to S3
-    const s3Response = await s3Client.send(new PutObjectCommand(uploadParams));
-  
-    // Log the S3 response
-    console.log('S3 Response:', s3Response);
-  
-    // Construct the S3 URL based on bucket and key
-    const imageUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${uploadParams.Key}`);
-    
+    // Upload profilePicture to S3
+    const profilePictureData = await uploadToS3(profilePictureFile, 'profilePicture');
+    // Upload backgroundImage to S3
+    const backgroundImageData = await uploadToS3(backgroundImageFile, 'background_image');
+
+    // Construct the S3 URLs based on bucket and key
+    const profilePictureUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${profilePictureData.s3Key}`);
+    const backgroundImageUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${backgroundImageData.s3Key}`);
+
     // Insert card information into the database
     connection.query(
-      'INSERT INTO cards (card_id, id, username, email, company, title, phone, instagram, facebook, linkedin, url, profile_image_url) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?);',
-      [cardId, userId, name, email, company, position, phone, instagram, facebook, linkedin, url, imageUrl],
-      async (err, result) => {
+      'INSERT INTO cards (card_id, id, username, email, company, title, phone, instagram, facebook, linkedin, url, profile_image_url, background_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      [cardId, userId, name, email, company, position, phone, instagram, facebook, linkedin, url, profilePictureUrl, backgroundImageUrl],
+      (err, result) => {
         if (err) {
           console.log("Error inserting card into database:", err);
           return res.status(500).json({ message: "Internal server error" });
         }
 
-        // Call the correct function here
-        try {
-          const data =  parsefile(req);
-          console.log(imageUrl);
-          res.status(201).json({ cardId, message: "Card created successfully", userId, data });
-        } catch (fileParserError) {
-          console.error("Error parsing file:", fileParserError);
-          res.status(500).json({ message: "Internal server error" });
-        }
+        res.status(201).json({ cardId, message: "Card created successfully", userId });
       }
     );
   } catch (error) {
@@ -344,7 +359,7 @@ router.post("/createcard", verifyTokenMiddleware, upload.single('profilePicture'
 });
 
 
-router.get("/:id/dashboard/cards", verifyTokenMiddleware ,(req, res, next) => {
+router.get("/:id/dashboard/cards", (req, res, next) => {
   connection.query(`SELECT * FROM cards WHERE id = ?;`, [req.params.id], (err, result) => {
     if (err) {
       return res.status(400).send({ message: err });
@@ -403,7 +418,7 @@ router.get('/images/:id', async (req, res) => {
         accessKeyId,
         secretAccessKey,
       },
-      region,
+      region, defaultAccessControlList: 'public-read',
     });
 
     // Fetch the image from S3
