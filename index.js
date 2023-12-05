@@ -1,8 +1,8 @@
-import express from "express";
-import cors from 'cors';
-import router from "./routes/router.js";
-import dotenv from "dotenv";
-import cookieParser from "cookie-parser";
+  import express from "express";
+  import cors from 'cors';
+  import router from "./routes/router.js";
+  import dotenv from "dotenv";
+  import cookieParser from "cookie-parser";
 
 const app = express();
 app.use(cookieParser());
@@ -58,4 +58,4 @@ app.use((req, res, next) => {
 });
 app.use("/api", router, (req,res,next)=> {console.log('REQUEST HEADERS:', req.headers); next()}) ;
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
