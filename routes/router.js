@@ -322,10 +322,9 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
   const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url } = req.body;
   const cardId = Math.floor(Math.random() * 1000000);
 
- 
-
-  const profilePictureFile = req.files.profilePicture[0];
-  const backgroundImageFile = req.files.background_image[0];
+  // Check if profilePicture and background_image fields exist in req.files
+  const hasProfilePicture = req.files && req.files.profilePicture && req.files.profilePicture[0];
+  const hasBackgroundImage = req.files && req.files.background_image && req.files.background_image[0];
 
   // Your S3 upload logic here
   const uploadToS3 = async (file, type) => {
@@ -352,14 +351,21 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
   };
 
   try {
-    // Upload profilePicture to S3
-    const profilePictureData = await uploadToS3(profilePictureFile, 'profilePicture');
-    // Upload backgroundImage to S3
-    const backgroundImageData = await uploadToS3(backgroundImageFile, 'background_image');
+    let profilePictureUrl, backgroundImageUrl;
 
-    // Construct the S3 URLs based on bucket and key
-    const profilePictureUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${profilePictureData.s3Key}`);
-    const backgroundImageUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${backgroundImageData.s3Key}`);
+    // Upload profilePicture to S3 if it exists
+    if (hasProfilePicture) {
+      const profilePictureFile = req.files.profilePicture[0];
+      const profilePictureData = await uploadToS3(profilePictureFile, 'profilePicture');
+      profilePictureUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${profilePictureData.s3Key}`);
+    }
+
+    // Upload backgroundImage to S3 if it exists
+    if (hasBackgroundImage) {
+      const backgroundImageFile = req.files.background_image[0];
+      const backgroundImageData = await uploadToS3(backgroundImageFile, 'background_image');
+      backgroundImageUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${backgroundImageData.s3Key}`);
+    }
 
     // Insert card information into the database
     connection.query(
@@ -379,7 +385,6 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
     return res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 
 router.get("/:id/dashboard/cards" ,(req, res, next) => {
