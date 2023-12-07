@@ -25,7 +25,7 @@ const upload = multer();
 const JWT_SECRET = process.env.JWT_SECRET;
 const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
 const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-const region = process.env.S3_REGION;
+const region = 'eu-west-2'
 const Bucket = process.env.S3_BUCKET;
 
 
