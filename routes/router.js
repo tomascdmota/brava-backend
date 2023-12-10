@@ -339,6 +339,7 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
       Key: s3Key,
       Body: fileBuffer,
       ContentType: contentType,
+      CacheControl: 'public, max-age=31536000', // Set cache control headers (1 year in seconds)
     };
 
     try {
