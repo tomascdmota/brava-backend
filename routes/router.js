@@ -493,23 +493,30 @@ export default router;
 
 
 
-router.post('/:id/message',(req,res,next) => {
+
+router.post('/:id/message', (req, res, next) => {
   const userId = req.params.id;
-  const contact_id = shortUUID.generate();
-  const {name, email, message} = req.body;
+  const contact_id = Math.floor(Math.random() * 10000) + 1;
+  const { name, email, company, message } = req.body;
   console.log("User id:", userId);
   console.log("Contact id:", contact_id);
   console.log("name:", name);
+  console.log("company:", company);
   console.log("email", email);
   console.log("Message", message);
 
-  connection.query(`INSERT INTO contacts (user_id, contact_id, name, email, message, contact_date ) VALUES (?, ?, ?, ?, ?, NOW())`, [userId, contact_id, name,email,message], async (err, result) => {
-    if(err) {
-      return res.status(500).send({message: "Error sending contact"});
+  connection.query(
+    `INSERT INTO contacts (user_id, contact_id, name, company, email, message, contact_date) VALUES (?, ?, ?, ?, ?, NOW())`,
+    [userId, contact_id, name, company, email, message],
+    async (err, result) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).send({ message: "Error sending contact" });
+      } else {
+        console.log("Query executed successfully");
+        return res.status(200).send({ message: "Message sent." });
+      }
     }
-    else{
-      return res.status(200).send({message: "Message sent."});
-    }
-  })
-})
+  );
+});
 
