@@ -10,6 +10,8 @@ import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import formidable from 'formidable';
 import imageType from 'image-type';
+import nodemailer from 'nodemailer'
+import bodyParser from 'body-parser';
 
 
 
@@ -183,61 +185,78 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
   );
 });
 
-router.post('/login' ,(req, res, next) => {
+router.post('/login', (req, res, next) => {
   connection.query(
     `SELECT * FROM users WHERE email = ?;`,
     [req.body.email],
-    (err, result) => {
-      if (err) {
-        return res.status(400).send({
-          message: err,
-        });
-      }
-      if (!result.length) {
-        return res.status(400).send({
-          message: 'Username or password incorrect!',
-        });
-      }
-      bcrypt.compare(req.body.password, result[0]['password'], (bErr, bResult) => {
-        if (bErr) {
+    async (err, result) => {
+      try {
+        if (err) {
+          console.error('Error querying the database:', err);
+          return res.status(500).json({ message: 'Internal Server Error' });
+        }
+        console.log(req.body.email)
+        console.log('SQL Query:', `SELECT * FROM users WHERE email = '${req.body.email}';`);
+        console.log('Result from Database:', result);
+
+        if (!result.length) {
           return res.status(400).send({
             message: 'Username or password incorrect!',
           });
         }
-        if (bResult) {
-          // password match
-          
 
-          // Generate a JWT token
-          const token = jwt.sign(
-            {
-                username: result[0].username,
-                userId: result[0].id,
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '30d' }
-        );
-        res.cookie('session_token', token, {
-          maxAge: 60*60*24*30*1000, //30 days
-          secure: false,
-          httpOnly: false,
-	  sameSite: 'None',
-        })
-          connection.query(`UPDATE users SET last_login = NOW() WHERE id = ?;`, [result[0].id]);
+        const inputtedPassword = req.body.password.trim();
+        const storedHashedPassword = result[0]['password'];
+
+        console.log('Inputted Password:', inputtedPassword);
+        console.log('Stored Hashed Password:', storedHashedPassword);
+
+        // Directly compare the stored hash with a manually generated hash
+        const manuallyGeneratedHash = '$2b$10$JDcL6JcNmIDtcQiu5etIf.oOOVZA2l2Pt7eVmaZU8OTzZPRmX91B6'; // Replace with the actual hash
+        const directComparison = manuallyGeneratedHash === storedHashedPassword;
+        console.log('Direct Comparison Result:', directComparison);
+
+        const passwordMatch = await bcrypt.compare(inputtedPassword, storedHashedPassword);
+        if (passwordMatch) {
+          const token = generateToken({
+            username: result[0].username,
+            userId: result[0].id,
+          });
+
+          res.cookie('session_token', token, {
+            maxAge: 60 * 60 * 24 * 30 * 1000, // 30 days
+            secure: process.env.NODE_ENV === 'production', // Set to true in production
+            httpOnly: false,
+            sameSite: 'None',
+          });
+
+          await connection.query(`UPDATE users SET last_login = NOW() WHERE id = ?;`, [result[0].id]);
 
           return res.status(200).send({
             message: 'Logged in!',
             token,
             user: result[0],
           });
+        } else {
+          console.log('Password does not match'); // Add this for troubleshooting
+          return res.status(400).send({
+            message: 'Username or password incorrect!',
+          });
         }
-        return res.status(400).send({
-          message: 'Username or password incorrect!',
-        });
-      });
+      } catch (error) {
+        console.error('Error during login:', error);
+        return res.status(500).json({ message: 'Internal Server Error' });
+      }
     }
   );
 });
+
+
+
+// Function to generate JWT token
+function generateToken(payload) {
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
+}
 
 
 // app.get('/test-cookie', (req, res) => {
@@ -495,29 +514,202 @@ export default router;
 
 
 
-router.post('/:id/message', (req, res, next) => {
+router.post('/:id/message', (req, res) => {
   const userId = req.params.id;
   const contact_id = Math.floor(Math.random() * 10000) + 1;
   const { name, email, company, message } = req.body;
-  console.log("User id:", userId);
-  console.log("Contact id:", contact_id);
-  console.log("name:", name);
-  console.log("company:", company);
-  console.log("email", email);
-  console.log("Message", message);
 
+  // Insert into the contacts table
   connection.query(
-    `INSERT INTO contacts (user_id, contact_id, name, company, email, message, contact_date) VALUES (?, ?, ?, ?, ?, NOW())`,
+    `INSERT INTO contacts (user_id, contact_id, name, company, email, message, contact_date) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
     [userId, contact_id, name, company, email, message],
-    async (err, result) => {
+    (err, result) => {
       if (err) {
         console.error('Database error:', err);
-        return res.status(500).send({ message: "Error sending contact" });
-      } else {
-        console.log("Query executed successfully");
-        return res.status(200).send({ message: "Message sent." });
+        return res.status(500).send({ message: 'Error sending contact' });
       }
+      console.log('Query executed successfully');
+
+      // Fetch user email from the database
+      connection.query(
+        `SELECT email, username FROM users WHERE id=?`,
+        [userId],
+        (err, result) => {
+          if (err) {
+            return res.status(400).send({ message: err });
+          }
+
+          if (!result.length) {
+            return res.status(400).send({
+              message: 'Email doesn\'t exist',
+            });
+          }
+
+          const user_email = result[0].email;
+          const username = result[0].username;
+          // Send email to the user email from the database
+          sendEmail(user_email, name,username, email, company, message);
+
+          return res.status(200).send({
+            message: 'Message sent.',
+            user_email: result,
+          });
+        }
+      );
     }
   );
 });
+
+function sendEmail(to, name, username, email, company, message) {
+  const transporter = nodemailer.createTransport({
+    host: 'smtpout.secureserver.net',
+    port: '465',
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  const mailOptions = {
+    from: 'no-reply@bravanfc.com',
+    to: to,
+    subject: `Recebeu uma nova Lead de ${name}`,
+    html: `
+    <!DOCTYPE html>
+    <html lang="pt">
+    
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>New Lead Notification</title>
+      <link href="https://fonts.googleapis.com/css2?family=Krona+One&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+      <style>
+        /* Add your styles here */
+        body {
+          margin: 0;
+          padding: 0;
+          font-family: 'Montserrat', sans-serif;
+        }
+    
+        table {
+          width: 100%;
+        }
+    
+        .content-container {
+          width: 600px;
+          margin: 0 auto;
+        }
+    
+        h1 {
+          color: #333;
+          font-family: 'Krona One', sans-serif;
+        }
+    
+        h3 {
+          color: #555;
+        }
+    
+        .content-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 20px;
+        }
+    
+        .content-table td {
+          padding: 10px;
+          border-bottom: 1px solid #ddd;
+          color: #666;
+        }
+    
+        button {
+          background-color: #4CAF50;
+          border: none;
+          color: white;
+          padding: 15px 32px;
+          text-align: center;
+          text-decoration: none;
+          display: inline-block;
+          font-size: 16px;
+          margin-top: 20px;
+          cursor: pointer;
+          border-radius: 5px;
+        }
+    
+        button:hover {
+          background-color: #45a049;
+        }
+    
+        img {
+          display: block;
+          margin: 0 auto; /* Center the image horizontally */
+        }
+      </style>
+    </head>
+    
+    <body>
+      <table>
+        <tr>
+          <td align="center">
+            <table class="content-container" bgcolor="#ffffff" cellpadding="0" cellspacing="0" align="center"
+              style="mso-table-lspace: 0pt; mso-table-rspace: 0pt; border-collapse: collapse; border-spacing: 0px; background-color: #ffffff; width: 100%;">
+              <tr>
+                <td align="left">
+                  <img src="https://res.cloudinary.com/dnho57ne8/image/upload/v1699917168/t6fy6tyrusdmynitqh3q.ico" alt="Logo"
+                    width="50">
+                </td>
+              </tr>
+              <tr>
+                <td align="left">
+                  <h1>Olá ${username}, recebeu uma nova lead!</h1>
+                </td>
+              </tr>
+              <tr>
+                <td align="left">
+                  <h3>Detalhes:</h3>
+                  <table class="content-table">
+                    <tr>
+                      <td><b>Nome:</b></td>
+                      <td>${name}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Empresa:</strong></td>
+                      <td>${company}</td>
+                    </tr>
+                    <tr>
+                      <td><b>Email:</b></td>
+                      <td>${email}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Mensagem:</strong></td>
+                      <td>${message}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td align="center">
+                  <a href="https://app.bravanfc.com/login"><button>Clique aqui para ver</button></a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    
+    </html>
+    
+    `,
+};
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error('Email sending error:', error);
+    } else {
+      console.log('Email sent:', info.response);
+    }
+  });
+}
 

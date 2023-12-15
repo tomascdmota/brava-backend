@@ -9,6 +9,7 @@ app.use(cookieParser());
 dotenv.config();
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://192.168.1.155:3000',
   'http://18.133.155.66:3000',
   'https://18.133.155.66:3000',
   'https://brava-bucket.s3.eu-west-2.amazonaws.com',
@@ -28,19 +29,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-app.use((req,res,next) => {
-  console.log('Request Headers:', req.headers);
-  next();
-});
 
 const PORT = 4001;
-
-
-app.use((req, res, next) => {
-  console.log('Request Headers:', req.headers);
-  console.log('Cookies:', req.cookies);
-  next();
-});
 
 
 app.use(express.json());
