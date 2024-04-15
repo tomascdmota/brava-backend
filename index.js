@@ -12,6 +12,7 @@ const allowedOrigins = [
   'http://192.168.1.155:3000',
   'http://18.133.155.66:3000',
   'https://18.133.155.66:3000',
+  'https://app.bravanfc.com',
   'https://brava-bucket.s3.eu-west-2.amazonaws.com',
 ];
 
@@ -21,6 +22,7 @@ app.use(cors({
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
+      console.log(origin)
     }
   },
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',

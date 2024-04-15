@@ -311,7 +311,7 @@ router.get('/:id/dashboard', (req, res) => {
  const token = req.headers.authorization;
           console.log("Incoming token:", token); 
   connection.query(
-    'SELECT * FROM contacts WHERE user_id = ?;',
+  " SELECT contacts.*, users.username, cards.profile_image_url FROM contacts JOIN users ON contacts.user_id = users.id JOIN cards ON contacts.user_id = cards.id WHERE contacts.user_id = ?;",
     [userId],
     (error, result) => {
       if (error) {
@@ -347,7 +347,7 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
 
   // Your S3 upload logic here
   const uploadToS3 = async (file, type) => {
-    const s3Key = `${type}_${Date.now().toString()}-${file.originalname}`;
+    const s3Key = accessKeyId;
     const fileBuffer = await fileToBuffer(file);
     const fileTypeResult = imageType(fileBuffer);
 
@@ -419,7 +419,6 @@ router.get("/:id/dashboard/cards" ,(req, res, next) => {
     }
 
     return res.status(200).send({
-      message: "Cards",
       cards: result,
     });
   });
@@ -435,7 +434,6 @@ router.get("/profile/:cardId", (req, res, next) => {
         message: 'No cards yet',
       });
     }
-    console.log(result)
     return res.status(200).send({
       message: "Cards",
       cards: result,
@@ -504,7 +502,7 @@ router.get("/:id/cards", (req, res, next) => {
     console.log(result);
     // Send the fetched data to the client
     return res.status(200).send({
-      message: "Cards",
+     
       cards: result,
     });
   });
