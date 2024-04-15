@@ -338,7 +338,7 @@ router.get('/:id/dashboard', (req, res) => {
 });
 
 router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'background_image', maxCount: 1 }]), async (req, res) => {
-  const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url } = req.body;
+  const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url,tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto } = req.body;
   const cardId = Math.floor(Math.random() * 1000000);
 
   // Check if profilePicture and background_image fields exist in req.files
@@ -389,8 +389,8 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
 
     // Insert card information into the database
     connection.query(
-      'INSERT INTO cards (card_id, id, username, email, company, title, phone, instagram, facebook, linkedin, url, profile_image_url, background_image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
-      [cardId, userId, name, email, company, position, phone, instagram, facebook, linkedin, url, profilePictureUrl, backgroundImageUrl],
+      'INSERT INTO cards (card_id, id, username, email, company, title, phone, instagram, facebook, linkedin, url, profile_image_url, background_image_url, tiktok,spotify,twitter,paypal,vinted,notes,standvirtual,olx,piscapisca,custojusto) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?,?,?,?,?,?,?);',
+      [cardId, userId, name, email, company, position, phone, instagram, facebook, linkedin, url, profilePictureUrl, backgroundImageUrl,tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto ],
       (err, result) => {
         if (err) {
           console.log("Error inserting card into database:", err);
@@ -485,26 +485,31 @@ router.get('/images/:id', async (req, res) => {
   });
 });
 
-
-router.get("/:id/cards", (req, res,next) => {
+router.get("/:id/cards", (req, res, next) => {
   const userId = req.params.id;
 
+  // Send immediate response to the client
+  res.status(200).send({ message: "Fetching cards..." });
+
+  // Fetch data asynchronously
   connection.query(`SELECT * FROM cards WHERE id = ?;`, [userId], (err, result) => {
     if (err) {
-      return res.status(400).send({ message: err });
+      console.error('Error fetching cards:', err);
+      // Handle the error and send an appropriate response
+      return res.status(500).send({ message: 'Internal Server Error' });
     }
     if (!result.length) {
-      return res.status(400).send({
-        message: 'No cards yet',
-      });
+      return res.status(400).send({ message: 'No cards found' });
     }
-    console.log(result)
+    console.log(result);
+    // Send the fetched data to the client
     return res.status(200).send({
       message: "Cards",
       cards: result,
     });
   });
 });
+
 
 export default router;
 
