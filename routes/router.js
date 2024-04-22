@@ -131,10 +131,14 @@ const fileToBuffer = (file) => {
 
 router.post('/sign-up', validateRegister, (req, res, next) => {
   const { username, email, phone, password } = req.body;
+
+  // Preprocess username: remove spacing and convert to lowercase
+  const processedUsername = username.replace(/\s/g, '').toLowerCase();
+
   // Check if the username already exists
   connection.query(
     'SELECT id FROM users WHERE LOWER(username) = LOWER(?);',
-    [username],
+    [processedUsername], // Use the preprocessed username
     (err, result) => {
       if (err) {
         console.error('Error checking for existing user:', err);
@@ -156,7 +160,7 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
           // Insert user data into the database
           connection.query(
             'INSERT INTO users (id, username, email, phone, password, registered, last_login) VALUES (?, ?, ?, ?, ?, NOW(), NOW());',
-            [userId, username, email, phone, hash],
+            [userId, processedUsername, email, phone, hash], // Use the preprocessed username
             (err, result) => {
               if (err) {
                 console.error('Error inserting user into the database:', err);
@@ -164,7 +168,7 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
               }
 
               // Generate JWT token
-              const token = jwt.sign({ userId, username, email }, JWT_SECRET, { expiresIn: '30d' });
+              const token = jwt.sign({ userId, username: processedUsername, email }, JWT_SECRET, { expiresIn: '30d' });
 
               // Assuming you want to send the user ID back to the frontend for session management
               req.userId = userId;
@@ -185,18 +189,19 @@ router.post('/sign-up', validateRegister, (req, res, next) => {
   );
 });
 
+
 router.post('/login', (req, res, next) => {
   connection.query(
-    `SELECT * FROM users WHERE email = ?;`,
-    [req.body.email],
+    `SELECT * FROM users WHERE username = ?;`,
+    [req.body.username],
     async (err, result) => {
       try {
         if (err) {
           console.error('Error querying the database:', err);
           return res.status(500).json({ message: 'Internal Server Error' });
         }
-        console.log(req.body.email)
-        console.log('SQL Query:', `SELECT * FROM users WHERE email = '${req.body.email}';`);
+        console.log(req.body.username)
+        console.log('SQL Query:', `SELECT * FROM users WHERE username = '${req.body.email}';`);
         console.log('Result from Database:', result);
 
         if (!result.length) {

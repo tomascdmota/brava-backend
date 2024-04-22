@@ -66,11 +66,11 @@ export async function validateRegister(req, res, next) {
     }
   }
   
-  async function checkExistingUser(username, email) {
+  async function checkExistingUser(username) {
     return new Promise((resolve, reject) => {
       connection.query(
-        'SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?);',
-        [username, email],
+        'SELECT id FROM users WHERE LOWER(username) = LOWER(?);',
+        [username],
         (error, result) => {
           if (error) {
             console.error('Error checking existing user:', error);
