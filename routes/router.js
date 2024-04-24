@@ -524,13 +524,13 @@ export default router;
 
 router.post('/:id/message', (req, res) => {
   const userId = req.params.id;
-  const contact_id = Math.floor(Math.random() * 10000) + 1;
-  const { name, email, company, message } = req.body;
+  const contact_id = Math.floor(Math.random() * 123235) + 1;
+  const { name, email, company,sector, phone, message, terms } = req.body;
 
   // Insert into the contacts table
   connection.query(
-    `INSERT INTO contacts (user_id, contact_id, name, company, email, message, contact_date) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-    [userId, contact_id, name, company, email, message],
+    `INSERT INTO contacts (user_id, contact_id, name, company, email, phone, sector, message, contact_date, terms_agreed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+    [userId, contact_id, name, company, email, phone, sector, message, terms],
     (err, result) => {
       if (err) {
         console.error('Database error:', err);
@@ -556,7 +556,7 @@ router.post('/:id/message', (req, res) => {
           const user_email = result[0].email;
           const username = result[0].username;
           // Send email to the user email from the database
-          sendEmail(user_email, name,username, email, company, message);
+          sendEmail(user_email, name,username, email, company,sector, phone, message);
 
           return res.status(200).send({
             message: 'Message sent.',
@@ -568,7 +568,7 @@ router.post('/:id/message', (req, res) => {
   );
 });
 
-function sendEmail(to, name, username, email, company, message) {
+function sendEmail(to, name, username, email, company,sector, phone,message) {
   const transporter = nodemailer.createTransport({
     host: 'smtpout.secureserver.net',
     port: '465',
@@ -682,8 +682,16 @@ function sendEmail(to, name, username, email, company, message) {
                       <td>${name}</td>
                     </tr>
                     <tr>
+                      <td><strong>Telemovel:</strong></td>
+                      <td>${phone}</td>
+                    </tr>
+                    <tr>
                       <td><strong>Empresa:</strong></td>
                       <td>${company}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Setor:</strong></td>
+                      <td>${sector}</td>
                     </tr>
                     <tr>
                       <td><b>Email:</b></td>
