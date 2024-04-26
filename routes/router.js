@@ -275,18 +275,6 @@ function generateToken(payload) {
 // });
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 router.get('/:id/profile',(req, res) => {
   const userId = req.params.id;
 
@@ -437,8 +425,8 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
 
 
 
-router.put("/updatecard", upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'background_image', maxCount: 1 }]), async (req, res) => {
-  const { cardId } = req.params;
+router.put("/updatecard/:id/:cardId", upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'background_image', maxCount: 1 }]), async (req, res) => {
+  const { id, cardId } = req.params;
   const { userId, username, email, company, position, phone, instagram, facebook, linkedin, url, tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto, address } = req.body;
 
   // Check if profilePicture and background_image fields exist in req.files
@@ -572,10 +560,11 @@ router.put("/updatecard", upload.fields([{ name: 'profilePicture', maxCount: 1 }
       updateValues.push(address);
     }
 
+    console.log(updateValues)
     // Execute the update query
     connection.query(
-      `UPDATE cards SET ${updateFields.map(field => `${field} = ?`).join(', ')} WHERE card_id = ? AND id = ?;`,
-      [...updateValues, cardId, userId],
+      `UPDATE cards SET ${updateFields.map(field => `${field} = ?`).join(', ')} WHERE card_id = ? `,
+      [...updateValues, cardId],
       (err, result) => {
         if (err) {
           console.error("Error updating card in database:", err);
