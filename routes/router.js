@@ -366,7 +366,7 @@ router.get('/:id/leads', (req, res) => {
 
 
 router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'background_image', maxCount: 1 }]), async (req, res) => {
-  const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url,tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto } = req.body;
+  const { userId, username, email, company, position, phone, instagram, facebook, linkedin, url, tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto } = req.body;
   const cardId = Math.floor(Math.random() * 1000000);
 
   // Check if profilePicture and background_image fields exist in req.files
@@ -375,7 +375,7 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
 
   // Your S3 upload logic here
   const uploadToS3 = async (file, type) => {
-    const s3Key = accessKeyId;
+    const s3Key = `${type}_${Date.now().toString()}-${file.originalname}`;// Using uuidv4 to generate a unique key
     const fileBuffer = await fileToBuffer(file);
     const fileTypeResult = imageType(fileBuffer);
 
@@ -404,21 +404,21 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
     // Upload profilePicture to S3 if it exists
     if (hasProfilePicture) {
       const profilePictureFile = req.files.profilePicture[0];
-      const profilePictureData = await uploadToS3(profilePictureFile, 'profilePicture');
+      const profilePictureData = await uploadToS3(profilePictureFile, 'profilePictures'); // Use a folder named profilePictures
       profilePictureUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${profilePictureData.s3Key}`);
     }
 
     // Upload backgroundImage to S3 if it exists
     if (hasBackgroundImage) {
       const backgroundImageFile = req.files.background_image[0];
-      const backgroundImageData = await uploadToS3(backgroundImageFile, 'background_image');
+      const backgroundImageData = await uploadToS3(backgroundImageFile, 'backgroundImages'); // Use a folder named backgroundImages
       backgroundImageUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${backgroundImageData.s3Key}`);
     }
 
     // Insert card information into the database
     connection.query(
       'INSERT INTO cards (card_id, id, username, email, company, title, phone, instagram, facebook, linkedin, url, profile_image_url, background_image_url, tiktok,spotify,twitter,paypal,vinted,notes,standvirtual,olx,piscapisca,custojusto) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?,?,?,?,?,?,?);',
-      [cardId, userId, name, email, company, position, phone, instagram, facebook, linkedin, url, profilePictureUrl, backgroundImageUrl,tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto ],
+      [cardId, userId, username, email, company, position, phone, instagram, facebook, linkedin, url, profilePictureUrl, backgroundImageUrl, tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto],
       (err, result) => {
         if (err) {
           console.log("Error inserting card into database:", err);
@@ -426,6 +426,163 @@ router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 
         }
 
         res.status(201).json({ cardId, message: "Card created successfully", userId });
+      }
+    );
+  } catch (error) {
+    console.error("Error uploading file to S3:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
+
+
+router.put("/updatecard", upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'background_image', maxCount: 1 }]), async (req, res) => {
+  const { cardId } = req.params;
+  const { userId, username, email, company, position, phone, instagram, facebook, linkedin, url, tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto, address } = req.body;
+
+  // Check if profilePicture and background_image fields exist in req.files
+  const hasProfilePicture = req.files && req.files.profilePicture && req.files.profilePicture[0];
+  const hasBackgroundImage = req.files && req.files.background_image && req.files.background_image[0];
+
+  // Your S3 upload logic here
+  const uploadToS3 = async (file, type) => {
+    const s3Key = `${type}_${Date.now().toString()}-${file.originalname}`;// Using uuidv4 to generate a unique key
+    const fileBuffer = await fileToBuffer(file);
+    const fileTypeResult = imageType(fileBuffer);
+
+    const contentType = fileTypeResult ? fileTypeResult.mime : 'application/octet-stream';
+
+    const uploadParams = {
+      Bucket,
+      Key: s3Key,
+      Body: fileBuffer,
+      ContentType: contentType,
+      CacheControl: 'public, max-age=31536000', // Set cache control headers (1 year in seconds)
+    };
+
+    try {
+      // Upload file to S3
+      const s3Response = await s3Client.send(new PutObjectCommand(uploadParams));
+      return { s3Response, s3Key };
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  try {
+    let profilePictureUrl, backgroundImageUrl;
+
+    // Upload profilePicture to S3 if it exists
+    if (hasProfilePicture) {
+      const profilePictureFile = req.files.profilePicture[0];
+      const profilePictureData = await uploadToS3(profilePictureFile, 'profilePictures');
+      profilePictureUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${profilePictureData.s3Key}`);
+    }
+
+    // Upload backgroundImage to S3 if it exists
+    if (hasBackgroundImage) {
+      const backgroundImageFile = req.files.background_image[0];
+      const backgroundImageData = await uploadToS3(backgroundImageFile, 'backgroundImages');
+      backgroundImageUrl = encodeURI(`https://${Bucket}.s3.${region}.amazonaws.com/${backgroundImageData.s3Key}`);
+    }
+
+    // Construct the update query based on the fields that were changed
+    const updateFields = [];
+    const updateValues = [];
+
+    if (username) {
+      updateFields.push('username');
+      updateValues.push(username);
+    }
+    if (email) {
+      updateFields.push('email');
+      updateValues.push(email);
+    }
+    if (company) {
+      updateFields.push('company');
+      updateValues.push(company);
+    }
+    if (position) {
+      updateFields.push('title');
+      updateValues.push(position);
+    }
+    if (phone) {
+      updateFields.push('phone');
+      updateValues.push(phone);
+    }
+    if (instagram) {
+      updateFields.push('instagram');
+      updateValues.push(instagram);
+    }
+    if (facebook) {
+      updateFields.push('facebook');
+      updateValues.push(facebook);
+    }
+    if (linkedin) {
+      updateFields.push('linkedin');
+      updateValues.push(linkedin);
+    }
+    if (url) {
+      updateFields.push('url');
+      updateValues.push(url);
+    }
+    if (tiktok) {
+      updateFields.push('tiktok');
+      updateValues.push(tiktok);
+    }
+    if (spotify) {
+      updateFields.push('spotify');
+      updateValues.push(spotify);
+    }
+    if (twitter) {
+      updateFields.push('twitter');
+      updateValues.push(twitter);
+    }
+    if (paypal) {
+      updateFields.push('paypal');
+      updateValues.push(paypal);
+    }
+    if (vinted) {
+      updateFields.push('vinted');
+      updateValues.push(vinted);
+    }
+    if (notes) {
+      updateFields.push('notes');
+      updateValues.push(notes);
+    }
+    if (standvirtual) {
+      updateFields.push('standvirtual');
+      updateValues.push(standvirtual);
+    }
+    if (olx) {
+      updateFields.push('olx');
+      updateValues.push(olx);
+    }
+    if (piscapisca) {
+      updateFields.push('piscapisca');
+      updateValues.push(piscapisca);
+    }
+    if (custojusto) {
+      updateFields.push('custojusto');
+      updateValues.push(custojusto);
+    }
+    if (address) {
+      updateFields.push('address');
+      updateValues.push(address);
+    }
+
+    // Execute the update query
+    connection.query(
+      `UPDATE cards SET ${updateFields.map(field => `${field} = ?`).join(', ')} WHERE card_id = ? AND id = ?;`,
+      [...updateValues, cardId, userId],
+      (err, result) => {
+        if (err) {
+          console.error("Error updating card in database:", err);
+          return res.status(500).json({ message: "Internal server error" });
+        }
+
+        res.status(200).json({ message: "Card updated successfully", cardId, userId });
       }
     );
   } catch (error) {
@@ -547,13 +704,13 @@ export default router;
 
 router.post('/:id/message', (req, res) => {
   const userId = req.params.id;
-  const contact_id = Math.floor(Math.random() * 10000) + 1;
-  const { name, email, company, message } = req.body;
+  const contact_id = Math.floor(Math.random() * 123235) + 1;
+  const { name, email, company,sector, phone, message, terms } = req.body;
 
   // Insert into the contacts table
   connection.query(
-    `INSERT INTO contacts (user_id, contact_id, name, company, email, message, contact_date) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-    [userId, contact_id, name, company, email, message],
+    `INSERT INTO contacts (user_id, contact_id, name, company, email, phone, sector, message, contact_date, terms_agreed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+    [userId, contact_id, name, company, email, phone, sector, message, terms],
     (err, result) => {
       if (err) {
         console.error('Database error:', err);
@@ -579,7 +736,7 @@ router.post('/:id/message', (req, res) => {
           const user_email = result[0].email;
           const username = result[0].username;
           // Send email to the user email from the database
-          sendEmail(user_email, name,username, email, company, message);
+          sendEmail(user_email, name,username, email, company,sector, phone, message);
 
           return res.status(200).send({
             message: 'Message sent.',
@@ -591,7 +748,7 @@ router.post('/:id/message', (req, res) => {
   );
 });
 
-function sendEmail(to, name, username, email, company, message) {
+function sendEmail(to, name, username, email, company,sector, phone,message) {
   const transporter = nodemailer.createTransport({
     host: 'smtpout.secureserver.net',
     port: '465',
@@ -705,8 +862,16 @@ function sendEmail(to, name, username, email, company, message) {
                       <td>${name}</td>
                     </tr>
                     <tr>
+                      <td><strong>Telemovel:</strong></td>
+                      <td>${phone}</td>
+                    </tr>
+                    <tr>
                       <td><strong>Empresa:</strong></td>
                       <td>${company}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Setor:</strong></td>
+                      <td>${sector}</td>
                     </tr>
                     <tr>
                       <td><b>Email:</b></td>
