@@ -313,10 +313,10 @@ router.get('/:id/profile',(req, res) => {
 
 router.get('/:id/dashboard', (req, res) => {
   const userId = req.params.id;
- const token = req.headers.authorization;
-          console.log("Incoming token:", token); 
+  const token = req.headers.authorization;
+  console.log("Incoming token:", token); 
   connection.query(
-  " SELECT contacts.*, users.username, cards.profile_image_url FROM contacts JOIN users ON contacts.user_id = users.id JOIN cards ON contacts.user_id = cards.id WHERE contacts.user_id = ?;",
+    "SELECT users.username, cards.profile_image_url FROM users LEFT JOIN cards ON users.id = cards.id WHERE users.id = ?;",
     [userId],
     (error, result) => {
       if (error) {
@@ -325,22 +325,45 @@ router.get('/:id/dashboard', (req, res) => {
         return res.status(500).json({ message: 'Internal Server Error', error: error.message });
       }
 
-      // You may want to handle the case where the result is an empty array differently,
-      // depending on your use case. For now, let's just return the array.
-    
-      const userData = result;
-
-      if(userData === null){
-        res.status(203).send({message: "No contacts"});
-        console.log("No userdata")
+      // Construct userData object with default values if result is empty
+      let userData = {};
+      if (result.length === 0) {
+        userData = {
+          username: 'No username', // Default username if not found
+          profile_image_url: 'default_profile_image_url' // Default profile image URL if not found
+        };
+        res.status(203).json(userData);
+        console.log("No userdata");
+      } else {
+        // If result is not empty, extract data from the result
+        userData = result[0];
+        res.json(userData);
+        console.log("User data:", userData);
       }
-      // Send user data to the frontend
-      res.json(userData);
-      console.log(userData)
-      console.log("Contact count:", userData.length)
     }
   );
 });
+
+
+router.get('/:id/leads', (req, res) => {
+  const userId = req.params.id;
+  // Perform your database query to fetch the contacts data for the given userId
+  // Example query:
+  connection.query(
+    'SELECT * FROM contacts WHERE user_id = ?',
+    [userId],
+    (error, results) => {
+      if (error) {
+        console.error('Error executing query:', error);
+        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+      }
+      // Send the fetched contacts data as JSON response
+      res.json(results);
+    }
+  );
+});
+
+
 
 router.post("/createcard", upload.fields([{ name: 'profilePicture', maxCount: 1 }, { name: 'background_image', maxCount: 1 }]), async (req, res) => {
   const { userId, name, email, company, position, phone, instagram, facebook, linkedin, url,tiktok, spotify, twitter, paypal, vinted, notes, standvirtual, olx, piscapisca, custojusto } = req.body;
