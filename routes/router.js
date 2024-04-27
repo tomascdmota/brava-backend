@@ -660,9 +660,6 @@ router.get('/images/:id', async (req, res) => {
 router.get("/:id/cards", (req, res, next) => {
   const userId = req.params.id;
 
-  // Send immediate response to the client
-  res.status(200).send({ message: "Fetching cards..." });
-
   // Fetch data asynchronously
   connection.query(`SELECT * FROM cards WHERE id = ?;`, [userId], (err, result) => {
     if (err) {
@@ -676,11 +673,11 @@ router.get("/:id/cards", (req, res, next) => {
     console.log(result);
     // Send the fetched data to the client
     return res.status(200).send({
-     
       cards: result,
     });
   });
 });
+
 
 
 export default router;
