@@ -359,7 +359,7 @@ router.get('/:id/dashboard', (req, res) => {
           console.error('Error executing leads query:', error);
           reject(error);
         } else {
-          resolve(leadsResult.length > 0 ? leadsResult[0] : {
+          resolve(leadsResult.length > 0 ? leadsResult : {
             city: null, // Default city if not found
             country: null, // Default country if not found
             date:null
@@ -702,7 +702,7 @@ router.get('/images/:id', async (req, res) => {
   try {
     // Use apiip library to get location information
     const location = await apiip.getLocation({
-      ip: ipAddress,
+      ip: '89.115.109.26',
       output: 'json',
       fields: 'city, regionName, countryName',
     });
@@ -712,7 +712,7 @@ router.get('/images/:id', async (req, res) => {
     const city = location.city;
     const country = location.countryName;
     // Generate a short UUID
-    const linkId = shortUUID.generate();
+    const linkId = Math.floor(Math.random() * 532164);
 
     // Insert a new row into the leads table with location and access date
     const accessDate = new Date(); // Current date and time
