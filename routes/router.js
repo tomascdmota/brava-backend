@@ -11,7 +11,9 @@ import multer from 'multer';
 import formidable from 'formidable';
 import imageType from 'image-type';
 import nodemailer from 'nodemailer'
-import bodyParser from 'body-parser';
+import axios from 'axios';
+import Apiip from 'apiip.net';
+const apiip = Apiip('fa54ad08-d0fe-4dab-b6d0-365c7e42dcff');
 
 
 
@@ -657,31 +659,77 @@ router.get('/images/:id', async (req, res) => {
   });
 });
 
-router.get("/:id/cards", (req, res, next) => {
-  const userId = req.params.id;
 
-  // Fetch data asynchronously
-  connection.query(`SELECT * FROM cards WHERE id = ?;`, [userId], (err, result) => {
-    if (err) {
-      console.error('Error fetching cards:', err);
-      // Handle the error and send an appropriate response
-      return res.status(500).send({ message: 'Internal Server Error' });
-    }
+ // Import Axios library for making HTTP requests
+ router.get("/:id/cards", async (req, res, next) => {
+  const userId = req.params.id;
+  const ipAddress = req.ip; // Get client's IP address
+
+  try {
+    // Use apiip library to get location information
+    const location = await apiip.getLocation({
+      ip: ipAddress,
+      output: 'json',
+      fields: 'city, regionName, countryName',
+    });
+
+    console.log(location);
+    
+    // Extract city and country from the location object
+    const city = location.city;
+    const country = location.countryName;
+    // Generate a short UUID
+    const linkId = shortUUID.generate();
+
+    // Insert a new row into the leads table with location and access date
+    const accessDate = new Date(); // Current date and time
+    const leadData = {
+      link_id: linkId, // Use the generated short UUID as link_id
+      user_id: userId,
+      access_date: accessDate,
+      city: city, // Insert city into the city column
+      country: country // Insert country into the country column
+    };
+    // Insert lead data into the leads table
+    const insertResult = await new Promise((resolve, reject) => {
+      connection.query(`INSERT INTO leads SET ?`, leadData, (insertErr, insertResult) => {
+        if (insertErr) {
+          console.error('Error inserting lead:', insertErr);
+          reject(insertErr);
+        } else {
+          resolve(insertResult);
+        }
+      });
+    });
+
+    // Fetch the user's cards
+    const result = await new Promise((resolve, reject) => {
+      connection.query(`SELECT * FROM cards WHERE id = ?;`, [userId], (fetchErr, result) => {
+        if (fetchErr) {
+          console.error('Error fetching cards:', fetchErr);
+          reject(fetchErr);
+        } else {
+          resolve(result);
+        }
+      });
+    });
+
     if (!result.length) {
       return res.status(400).send({ message: 'No cards found' });
     }
-    console.log(result);
+
     // Send the fetched data to the client
     return res.status(200).send({
       cards: result,
     });
-  });
+  } catch (error) {
+    console.error('Error:', error);
+    return res.status(500).send({ message: 'Internal Server Error' });
+  }
 });
 
 
-
 export default router;
-
 
 
 
