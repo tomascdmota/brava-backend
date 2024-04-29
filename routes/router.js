@@ -300,58 +300,92 @@ router.get('/:id/profile',(req, res) => {
 )  
 });
 
-
 router.get('/:id/dashboard', (req, res) => {
   const userId = req.params.id;
   const token = req.headers.authorization;
   console.log("Incoming token:", token); 
-  connection.query(
-    "SELECT users.username, cards.profile_image_url FROM users LEFT JOIN cards ON users.id = cards.id WHERE users.id = ?;",
-    [userId],
-    (error, result) => {
-      if (error) {
-        console.error('Error executing query:', error);
-        connection.release();
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
-      }
 
-      // Construct userData object with default values if result is empty
-      let userData = {};
-      if (result.length === 0) {
-        userData = {
-          username: 'No username', // Default username if not found
-          profile_image_url: 'default_profile_image_url' // Default profile image URL if not found
-        };
-        res.status(203).json(userData);
-        console.log("No userdata");
-      } else {
-        // If result is not empty, extract data from the result
-        userData = result[0];
-        res.json(userData);
-        console.log("User data:", userData);
-      }
-    }
-  );
+  // Query to fetch user data and card profile image URL
+  const userDataQuery = `
+    SELECT users.username, cards.profile_image_url 
+    FROM users 
+    LEFT JOIN cards ON users.id = cards.id 
+    WHERE users.id = ?;
+  `;
+
+  // Query to fetch contacts data
+  const contactsQuery = `
+    SELECT * FROM contacts WHERE user_id = ?;
+  `;
+
+  // Query to fetch lead data (city and country)
+  const leadsQuery = `
+    SELECT * 
+    FROM leads 
+    WHERE user_id = ?;
+  `;
+
+  // Execute all queries in parallel using Promise.all
+  Promise.all([
+    // Query to fetch user data and card profile image URL
+    new Promise((resolve, reject) => {
+      connection.query(userDataQuery, [userId], (error, userDataResult) => {
+        if (error) {
+          console.error('Error executing user data query:', error);
+          reject(error);
+        } else {
+          resolve(userDataResult.length > 0 ? userDataResult[0] : {
+            username: 'No username', // Default username if not found
+            profile_image_url: 'default_profile_image_url' // Default profile image URL if not found
+          });
+        }
+      });
+    }),
+    // Query to fetch contacts data
+    new Promise((resolve, reject) => {
+      connection.query(contactsQuery, [userId], (error, contactsResult) => {
+        if (error) {
+          console.error('Error executing contacts query:', error);
+          reject(error);
+        } else {
+          resolve(contactsResult);
+        }
+      });
+    }),
+    // Query to fetch lead data (city and country)
+    new Promise((resolve, reject) => {
+      connection.query(leadsQuery, [userId], (error, leadsResult) => {
+        if (error) {
+          console.error('Error executing leads query:', error);
+          reject(error);
+        } else {
+          resolve(leadsResult.length > 0 ? leadsResult[0] : {
+            city: null, // Default city if not found
+            country: null, // Default country if not found
+            date:null
+          });
+        }
+      });
+    })
+  ])
+  .then(([userData, contactsData, leadsData]) => {
+    // Construct the final response object
+    const responseData = {
+      userData,
+      contactsData,
+      leadsData
+    };
+    // Send the combined data as JSON response
+    res.json(responseData);
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  });
 });
 
 
-router.get('/:id/leads', (req, res) => {
-  const userId = req.params.id;
-  // Perform your database query to fetch the contacts data for the given userId
-  // Example query:
-  connection.query(
-    'SELECT * FROM contacts WHERE user_id = ?',
-    [userId],
-    (error, results) => {
-      if (error) {
-        console.error('Error executing query:', error);
-        return res.status(500).json({ message: 'Internal Server Error', error: error.message });
-      }
-      // Send the fetched contacts data as JSON response
-      res.json(results);
-    }
-  );
-});
+
 
 
 
@@ -673,7 +707,6 @@ router.get('/images/:id', async (req, res) => {
       fields: 'city, regionName, countryName',
     });
 
-    console.log(location);
     
     // Extract city and country from the location object
     const city = location.city;
@@ -730,7 +763,6 @@ router.get('/images/:id', async (req, res) => {
 
 
 export default router;
-
 
 
 
