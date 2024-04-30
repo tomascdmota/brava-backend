@@ -385,6 +385,26 @@ router.get('/:id/dashboard', (req, res) => {
 });
 
 
+router.get("/:id/contacts", (req,res) => {
+  const userId = req.params.id;
+  connection.query("SELECT * FROM contacts WHERE user_id = ?", [userId], (error, result) => {
+    if (error) {
+      return res.status(400).send({ message: error });
+    }
+    if (!result.length) {
+      return res.status(400).send({
+        message: 'No Contacts yet',
+      });
+    }
+    console.log('Result',result)
+    return res.status(200).send({
+      contacts: result,
+    });
+  })
+})
+
+
+
 
 
 
