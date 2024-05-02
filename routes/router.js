@@ -723,7 +723,7 @@ router.get('/images/:id', async (req, res) => {
     // Use apiip library to get location information
     const location = await apiip.getLocation({
       //TODO change ip back to ipAddress
-      ip: '89.115.109.26',
+      ip: ipAddress,
       output: 'json',
       fields: 'city, regionName, countryName',
     });
