@@ -1079,3 +1079,40 @@ function sendEmail(to, name, username, email, company,sector, phone,message) {
   });
 }
 
+
+router.get('/:userId/icon-engagement', (req, res) => {
+  const userId = req.params.userId;
+  console.log(userId)
+  connection.query(
+    'SELECT google_reviews_count, instagram_count, facebook_count, linkedin_count, youtube_count, paypal_count, twitter_count, tiktok_count, spotify_count, vinted_count, notes_count, address_count, standvirtual_count, olx_count, piscapisca_count, custojusto_count, url_count FROM leads WHERE user_id = ?',
+    [userId],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+
+      // Calculate counts
+          const engagementCounts = results.reduce((counts, lead) => {
+            for (const key in lead) {
+              if (key !== 'city' && key !== 'country') {
+                counts[key] = counts[key] ? counts[key] + lead[key] : lead[key];
+              }
+            }
+            return counts;
+          }, {});
+
+          // Convert engagementCounts object to array of objects for sorting
+          const engagementCountsArray = Object.entries(engagementCounts).map(([metric, count]) => ({ metric, count }));
+
+          // Sort the array by count in descending order
+          engagementCountsArray.sort((a, b) => b.count - a.count);
+
+          // Select top 5 engagement metrics (excluding city and country)
+          const top5Metrics = engagementCountsArray.filter(entry => entry.metric !== 'city' && entry.metric !== 'country').slice(0, 5);
+          console.log(top5Metrics)
+          return res.json({ top5Metrics });
+
+    }
+  );
+});
