@@ -702,6 +702,7 @@ router.get('/images/:id', async (req, res) => {
   try {
     // Use apiip library to get location information
     const location = await apiip.getLocation({
+      //TODO change ip back to ipAddress
       ip: '89.115.109.26',
       output: 'json',
       fields: 'city, regionName, countryName',
@@ -754,6 +755,7 @@ router.get('/images/:id', async (req, res) => {
     // Send the fetched data to the client
     return res.status(200).send({
       cards: result,
+      linkId: linkId
     });
   } catch (error) {
     console.error('Error:', error);
@@ -764,6 +766,88 @@ router.get('/images/:id', async (req, res) => {
 
 export default router;
 
+router.post('/:linkId/leads', (req, res) => {
+  const linkId = req.params.linkId;
+
+
+  // Initialize count values to zero if they are null
+  const {
+    google_reviews,
+    instagram,
+    facebook,
+    linkedin,
+    youtube,
+    paypal,
+    twitter,
+    tiktok,
+    spotify,
+    vinted,
+    notes,
+    address,
+    standvirtual,
+    olx,
+    piscapisca,
+    custojusto
+  } = req.body;
+
+  // Convert null values to zero
+  const initializeCount = (value) => (value === null ? 0 : value);
+
+  // Initialize count values to zero if they are null
+  const initializedValues = [
+    initializeCount(google_reviews),
+    initializeCount(instagram),
+    initializeCount(facebook),
+    initializeCount(linkedin),
+    initializeCount(youtube),
+    initializeCount(paypal),
+    initializeCount(twitter),
+    initializeCount(tiktok),
+    initializeCount(spotify),
+    initializeCount(vinted),
+    initializeCount(notes),
+    initializeCount(address),
+    initializeCount(standvirtual),
+    initializeCount(olx),
+    initializeCount(piscapisca),
+    initializeCount(custojusto)
+  ];
+
+
+  const sql = `
+    UPDATE leads
+    SET
+        google_reviews_count = google_reviews_count + ?,
+        instagram_count = instagram_count + ?,
+        facebook_count = facebook_count + ?,
+        linkedin_count = linkedin_count + ?,
+        youtube_count = youtube_count + ?,
+        paypal_count = paypal_count + ?,
+        twitter_count = twitter_count + ?,
+        tiktok_count = tiktok_count + ?,
+        spotify_count = spotify_count + ?,
+        vinted_count = vinted_count + ?,
+        notes_count = notes_count + ?,
+        address_count = address_count + ?,
+        standvirtual_count = standvirtual_count + ?,
+        olx_count = olx_count + ?,
+        piscapisca_count = piscapisca_count + ?,
+        custojusto_count = custojusto_count + ?
+    WHERE
+        link_id = ${linkId};
+  `;
+
+
+  connection.query(sql, initializedValues, (error, results) => {
+    if (error) {
+      console.error('Error updating leads:', error);
+      res.sendStatus(500); // Send internal server error status
+    } else {
+      console.log('Leads updated successfully');
+      res.sendStatus(200); // Send success status
+    }
+  });
+});
 
 
 
