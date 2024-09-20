@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "target": "ES6",                  // Set to ES6 or later
+      "module": "CommonJS",              // For Node.js compatibility
+      "strict": true,                    // Enable strict type-checking
+      "esModuleInterop": true,           // Interoperability for CommonJS and ES6 modules
+      "skipLibCheck": true,              // Skips type checking for node_modules
+      "forceConsistentCasingInFileNames": true, // Enforce file name casing consistency
+      "outDir": "./build",               // Output folder for compiled .js files
+      "rootDir": ".",                    // Set root directory to the project root
+    },
+    "include": ["./**/*.ts"],            // Include all .ts files in the project root and subfolders
+    "exclude": ["node_modules"]          // Exclude node_modules from compilation
+  }
+  
