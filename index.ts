@@ -19,6 +19,7 @@ const allowedOrigins = [
   'https://18.133.155.66:3000',
   'https://app.bravanfc.com',
   'https://brava-bucket.s3.eu-west-2.amazonaws.com',
+  '*'
 ];
 
 app.use(cors({
@@ -41,4 +42,6 @@ app.use('/api/card', cardRoutes);
 
 const PORT = process.env.PORT || 4001;
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(4001, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
