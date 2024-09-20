@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  backend:
+    image: brava-api
+    build:
+      context: .
+      dockerfile: Dockerfile # Adjust if your Dockerfile is named differently
+    ports:
+      - "4001:4001"
+    env_file:
+      - .env # Make sure this points to your .env file
