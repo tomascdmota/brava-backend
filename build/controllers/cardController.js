@@ -15,7 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const cardService_1 = __importDefault(require("../services/cardService"));
 const cardController = {
     getCard: (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-        const { card_id } = req.params; // Changed from req.body to req.params
+        const card_id = req.params.id; // Changed from req.body to req.params
         try {
             const card = yield cardService_1.default.getCard(card_id);
             res.status(200).send(card); // Directly send the card object
