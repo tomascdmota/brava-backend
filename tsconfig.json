@@ -7,7 +7,11 @@
       "skipLibCheck": true,              // Skips type checking for node_modules
       "forceConsistentCasingInFileNames": true, // Enforce file name casing consistency
       "outDir": "./build",               // Output folder for compiled .js files
-      "rootDir": ".",                    // Set root directory to the project root
+      "rootDir": ".",           
+      "typeRoots": [
+            "./node_modules/@types",
+            "./@types" // Add this line if your custom types are here
+        ]      
     },
     "include": ["./**/*.ts"],            // Include all .ts files in the project root and subfolders
     "exclude": ["node_modules"]          // Exclude node_modules from compilation

@@ -18,6 +18,8 @@ const allowedOrigins = [
   'http://18.133.155.66:3000',
   'https://18.133.155.66:3000',
   'https://app.bravanfc.com',
+  'http://185.97.146.17:3000',
+  'http://srv597605.hstgr.cloud:3000',
   'https://brava-bucket.s3.eu-west-2.amazonaws.com',
   '*'
 ];
