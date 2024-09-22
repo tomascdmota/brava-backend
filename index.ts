@@ -33,11 +33,14 @@ app.use(cors({
       console.log(origin);
     }
   },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   credentials: true,
   optionsSuccessStatus: 204,
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+
+app.options('*', cors()); // Handle preflight
 
 app.use('/api/auth', authRoutes);
 app.use('/api/card', cardRoutes);  
