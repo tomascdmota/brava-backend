@@ -25,19 +25,17 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-      console.log(origin);
-    }
-  },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  origin: allowedOrigins,
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   optionsSuccessStatus: 204,
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+app.use((req, res, next) => {
+  console.log(`Incoming request from: ${req.get('origin')}`);
+  next();
+});
 
 
 app.options('*', cors()); // Handle preflight
