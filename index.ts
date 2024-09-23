@@ -21,21 +21,29 @@ const allowedOrigins = [
   'http://185.97.146.17:3000',
   'http://srv597605.hstgr.cloud:3000',
   'https://brava-bucket.s3.eu-west-2.amazonaws.com',
-  '*'
 ];
 
 app.use(cors({
-  origin: allowedOrigins,
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true,
-  optionsSuccessStatus: 204,
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests, etc.)
+    if (!origin) return callback(null, true);
 
-app.use((req, res, next) => {
-  console.log(`Incoming request from: ${req.get('origin')}`);
-  next();
-});
+    // Log the incoming origin for debugging
+    console.log(`Incoming origin: ${origin}`);
+
+    // Check if the incoming origin is in the allowed list
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.error(`Origin not allowed by CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true, // Allow cookies/auth headers
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204
+}));
 
 
 app.options('*', cors()); // Handle preflight
